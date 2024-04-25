@@ -1,0 +1,102 @@
+# tasks file for roles/container/nginx-proxy
+---
+- name: Create a proxy network
+  community.docker.docker_network:
+    name: proxy_network
+    driver: bridge
+    driver_options:
+      com.docker.network.bridge.name: "br-{{ service_name }}"
+    internal: false
+
+- name: Get all running containers
+  ansible.builtin.command: docker ps --format "{{ '{{' }} .Names {{ '}}' }}"
+  register: all_containers
+
+- name: Add containers and configure vhosts with custom settings
+  ansible.builtin.include_task: add_containers.yml
+  loop: "{{ all_containers.stdout_lines }}"
+  loop_control:
+    loop_var: container
+
+- name: Ensure the service folder structure exists
+  ansible.builtin.file:
+    state: directory
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: "755"
+  loop:
+    - "{{ service_data_location }}/etc/"
+    - "{{ service_data_location }}/etc/vhost.d"
+    - "{{ service_data_location }}/etc/conf.d"
+    - "{{ service_data_location }}/etc/certs"
+
+- name: Make sure the nginx-proxy container is created and running
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    image: "nginxproxy/nginx-proxy"
+    recreate: true
+    keep_volumes: true
+    restart_policy: unless-stopped
+    networks:
+      - name: proxy_network
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "{{ service_data_location }}/etc:/etc/nginx/"
+      - "{{ service_data_location }}/html:/usr/share/nginx/html"
+      - "/var/run/docker.sock:/tmp/docker.sock:ro"
+
+- name: Make sure the acme-companion container is created and running
+  community.docker.docker_container:
+    name: "{{ service_name }}-acme"
+    image: "nginxproxy/acme-companion"
+    recreate: true
+    keep_volumes: true
+    restart_policy: unless-stopped
+    env:
+      DEFAULT_EMAIL: "{{ admin_email }}"
+      NGINX_PROXY_CONTAINER: "{{ service_name }}"
+    volumes:
+      - "{{ service_data_location }}/etc:/etc/nginx/"
+      - "{{ service_data_location }}/html:/usr/share/nginx/html"
+      - "{{ service_data_location }}/acme:/etc/acme.sh"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+- name: Make sure the self-signed-proxy-companion container is created and running
+  community.docker.docker_container:
+    name: "{{ service_name }}-self-signed-companion"
+    image: sebastienheyd/self-signed-proxy-companion
+    recreate: true
+    keep_volumes: true
+    restart_policy: unless-stopped
+    env:
+      NGINX_PROXY_CONTAINER: "{{ service_name }}"
+    volumes:
+      - "{{ service_data_location }}/etc/certs:/etc/nginx/certs"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+- name: Copy custom config files to nginx conf.d directory
+  ansible.builtin.copy:
+    src: "files/proxy_defaults.conf"
+    dest: "{{ service_data_location }}/etc/conf.d/proxy_defaults.conf"
+  notify:
+    - Restart nginx-proxy container
+
+- name: Inject nginx server settings into nginx.conf
+  ansible.builtin.lineinfile:
+    path: "{{ service_data_location }}/etc/nginx.conf"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.value }}"
+    insertafter: "{{ item.after }}"
+  loop:
+    - regexp: "^worker_processes .*;"
+      line: "worker_processes {{ nginx_worker_processes }};"
+      after: "user .*;"
+    - regexp: "^worker_connections .*;"
+      line: "worker_connections {{ nginx_worker_connections }};"
+      after: "^worker_processes .*;"
+    - regexp: "^multi_accept .*;"
+      line: "multi_accept {{ nginx_multi_accept }};"
+      after: "^worker_connections .*;"

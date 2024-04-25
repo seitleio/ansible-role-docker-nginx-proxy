@@ -1,0 +1,11 @@
+service_name: "nginx-proxy"
+service_data_location: "{{ data_base_path }}/{{ service_name }}"
+
+nginx_proxy_buffer_size: "128k"
+nginx_proxy_buffers: "4 256k"
+nginx_proxy_busy_buffers_size: "256k"
+nginx_client_max_body_size: "100m"
+
+nginx_worker_processes: "{{ ansible_processor_vcpus|default(ansible_processor_count) }}"
+nginx_worker_connections: "1024"
+nginx_multi_accept: "off"

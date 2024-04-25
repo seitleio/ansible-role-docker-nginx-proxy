@@ -1,0 +1,38 @@
+---
+- name: Get infos on containers
+  community.docker.docker_container_info:
+    name: "{{ container }}"
+  register: container_info
+
+- name: Add container to the proxy network
+  ansible.builtin.command: "docker network connect proxy_network {{ container }}"
+  loop: "{{ result['container']['Config']['Env'] }}"
+  when: item is match("VIRTUAL_HOST=.*")
+
+- name: Remember vhost domain
+  set_fact:
+    vhost_domain: "{{ (item | split('='))[1] }}"
+  loop: "{{ result['container']['Config']['Env'] }}"
+  when:
+    - item is match("VIRTUAL_HOST=.*")
+
+- name: Get all NGINX_ variables
+  set_fact:
+    nginx_settings: "{{ nginx_settings|default([]) + [ var ] }}"
+  vars:
+    var:
+      setting: "{{ item | split('=')[0] | regex_replace('NGINX_.*','') | lower }}"
+      value: "{{ vars + (item | split('='))[1] }}"
+  loop: "{{ result['container']['Config']['Env'] }}"
+  when:
+    - vhost_domain is defined
+    - item is match("NGINX_[A-Z_]*=.*")
+
+- name: Configure client_max_body_size for vhost  
+  ansible.builtin.lineinfile:
+    path: "{{ service_data_location }}/etc/vhost.d/{{ vhost_domain }}"
+    regexp: "{{ item.setting }} .*;"
+    line: "{{ item.setting}} {{ item.value }};"
+  when:
+    - vhost_domain is defined
+  loop: "{{ nginx_settings }}"

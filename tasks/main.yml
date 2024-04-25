@@ -13,7 +13,7 @@
   register: all_containers
 
 - name: Add containers and configure vhosts with custom settings
-  ansible.builtin.include_task: add_containers.yml
+  ansible.builtin.include_tasks: add_containers.yml
   loop: "{{ all_containers.stdout_lines }}"
   loop_control:
     loop_var: container

@@ -6,13 +6,21 @@
 
 - name: Add container to the proxy network
   ansible.builtin.command: "docker network connect proxy_network {{ container }}"
-  loop: "{{ result['container']['Config']['Env'] }}"
-  when: item is match("VIRTUAL_HOST=.*")
+  loop: "{{ container_info['container']['Config']['Env'] }}"
+  register: network_membership
+  when:
+    - item is match("VIRTUAL_HOST=.*")
+    - container_info.container.NetworkSettings.Networks.proxy_network is not defined
+
+- name: Restart affected container
+  ansible.builtin.command: "docker restart {{ container }}"
+  when:
+    - network_membership.changed
 
 - name: Remember vhost domain
   set_fact:
     vhost_domain: "{{ (item | split('='))[1] }}"
-  loop: "{{ result['container']['Config']['Env'] }}"
+  loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
     - item is match("VIRTUAL_HOST=.*")
 
@@ -21,18 +29,22 @@
     nginx_settings: "{{ nginx_settings|default([]) + [ var ] }}"
   vars:
     var:
-      setting: "{{ item | split('=')[0] | regex_replace('NGINX_.*','') | lower }}"
-      value: "{{ vars + (item | split('='))[1] }}"
-  loop: "{{ result['container']['Config']['Env'] }}"
+      setting: "{{ (item | split('='))[0] | regex_replace('NGINX_','') | lower }}"
+      value: "{{ (item | split('='))[1] }}"
+  loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
     - vhost_domain is defined
     - item is match("NGINX_[A-Z_]*=.*")
 
-- name: Configure client_max_body_size for vhost  
+- name: Configure vhost custom settings
   ansible.builtin.lineinfile:
-    path: "{{ service_data_location }}/etc/vhost.d/{{ vhost_domain }}"
+    path: "{{ service_data_location }}/vhost.d/{{ vhost_domain }}"
     regexp: "{{ item.setting }} .*;"
     line: "{{ item.setting}} {{ item.value }};"
+    create: true
   when:
     - vhost_domain is defined
+    - nginx_settings is defined
   loop: "{{ nginx_settings }}"
+  notify:
+    - Restart nginx-proxy container

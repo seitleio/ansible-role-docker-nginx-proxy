@@ -1,5 +1,5 @@
 - name: Restart nginx-proxy container
   community.docker.docker_container:
     name: "{{ service_name }}"
-    recreate: true
+    recreate: "{{ allow_recreate_containers | default('false') }}"
     keep_volumes: true

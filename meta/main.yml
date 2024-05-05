@@ -1,4 +1,6 @@
 galaxy_info:
+  role_name: docker_nginx_proxy
+  namespace: seitleio
   author: Johannes Seitle
   description: Configures the nginx-proxy container
   company: seitle.io

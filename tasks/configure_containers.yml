@@ -34,7 +34,7 @@
   loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
     - vhost_domain is defined
-    - item is match("NGINX_(?!VERSION)[A-Z_]*=.*")
+    - item is match("NGINX_(?!VERSION|PROXY_CONTAINER)[A-Z_]*=.*")
 
 - name: Configure vhost custom settings
   ansible.builtin.lineinfile:

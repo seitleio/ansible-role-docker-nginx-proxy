@@ -24,17 +24,17 @@
   when:
     - item is match("VIRTUAL_HOST=.*")
 
-- name: Get all NGINX_ variables
+- name: Get all NGINX_CONFIG_ variables
   set_fact:
     nginx_settings: "{{ nginx_settings|default([]) + [ var ] }}"
   vars:
     var:
-      setting: "{{ (item | split('='))[0] | regex_replace('NGINX_','') | lower }}"
+      setting: "{{ (item | split('='))[0] | regex_replace('NGINX_CONFIG_','') | lower }}"
       value: "{{ (item | split('='))[1] }}"
   loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
     - vhost_domain is defined
-    - item is match("NGINX_(?!VERSION|PROXY_CONTAINER)[A-Z_]*=.*")
+    - item is match("NGINX_CONFIG_[A-Z_]*=.*")
 
 - name: Configure vhost custom settings
   ansible.builtin.lineinfile:

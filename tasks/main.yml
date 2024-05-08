@@ -62,11 +62,13 @@
   ansible.builtin.template:
     src: "proxy_defaults.conf.j2"
     dest: "{{ service_data_location }}/conf.d/proxy_defaults.conf"
+    mode: "0544"
   notify:
     - Restart nginx-proxy container
 
 - name: Get all running containers
   ansible.builtin.command: docker ps --format "{{ '{{' }} .Names {{ '}}' }}"
+  changed_when: false
   register: all_containers
 
 - name: Add containers and configure vhosts with custom settings

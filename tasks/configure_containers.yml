@@ -4,40 +4,38 @@
     name: "{{ container }}"
   register: container_info
 
-- name: "Add container to the proxy network"
-  ansible.builtin.command: "docker network connect proxy_network {{ container }}"
-  loop: "{{ container_info['container']['Config']['Env'] }}"
-  register: network_membership
-  when:
-    - item is match("VIRTUAL_HOST=.*")
-    - container_info.container.NetworkSettings.Networks.proxy_network is not defined
-
-- name: "Restart affected container {{ container }}"
-  ansible.builtin.command: "docker restart {{ container }}"
-  when:
-    - network_membership.changed
-
 - name: Remember vhost domain
   ansible.builtin.set_fact:
     vhost_domain: "{{ (item | split('='))[1] }}"
+    containers_with_domains: "{{ containers_with_domains | default([]) + [container] }}"
   loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
     - item is match("VIRTUAL_HOST=.*")
 
+- name: "Add container to the proxy network"
+  ansible.builtin.command: "docker network connect proxy_network {{ container }}"  
+  register: network_membership
+  changed_when: "network_membership.rc == 0"
+  when:
+    - container in containers_with_domains | default([])
+    - container_info.container.NetworkSettings.Networks.proxy_network is not defined
+  notify: Restart nginx-proxy container
+
+- name: Create empty nginx_settings list
+  ansible.builtin.set_fact:
+    nginx_settings: []
+
 - name: Get all NGINX_CONFIG_ variables
   ansible.builtin.set_fact:
-    nginx_settings: "{{ nginx_settings|default([]) + [ var ] }}"
+    nginx_settings: "{{ nginx_settings + [var] }}"
   vars:
     var:
       setting: "{{ (item | split('='))[0] | regex_replace('NGINX_CONFIG_','') | lower }}"
       value: "{{ (item | split('='))[1] }}"
   loop: "{{ container_info['container']['Config']['Env'] }}"
   when:
-    - vhost_domain is defined
+    - container in containers_with_domains | default([])
     - item is match("NGINX_CONFIG_[A-Z_]*=.*")
-
-- debug:
-    var: nginx_settings
 
 - name: Configure vhost custom settings
   ansible.builtin.lineinfile:
@@ -45,16 +43,10 @@
     regexp: "{{ item.setting }} .*;"
     line: "{{ item.setting}} {{ item.value }};"
     create: true
-  when:
-    - vhost_domain is defined
+    mode: "0544"
+  when:    
+    - container in containers_with_domains | default([])
     - nginx_settings | length > 0
   loop: "{{ nginx_settings }}"
   notify:
     - Restart nginx-proxy container
-
-- name: Clear variables
-  ansible.builtin.set_fact:
-    nginx_settings: []
-    vhost_domain:
-  when:
-    - vhost_domain is defined

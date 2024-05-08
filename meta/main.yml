@@ -8,7 +8,7 @@ galaxy_info:
   min_ansible_version: "2.1"
   galaxy_tags:
     - nginx
-    - reverse-proxy
+    - reverseproxy
     - proxy
     - docker
 dependencies:

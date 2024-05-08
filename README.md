@@ -82,7 +82,7 @@ Author Information
 Johannes Seitle <<johannes@seitle.io>>
 
 <br/><br/><hr/>
-<center>
+<p align="center" style="font-size:24px">
 <img src="https://avatars.githubusercontent.com/u/102231325?s=400&u=0c500c28b968020e0c306478e55779ed7a872a98&v=4" width="128"/><br/>
-<span style="font-size:24px">seitle.io</span>
-</center>
+seitle.io
+<p/>

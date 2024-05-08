@@ -2,7 +2,7 @@ Ansible Role: docker-nginx-proxy
 =========
 [![Ansible Lint](https://github.com/seitleio/ansible-role-docker-nginx-proxy/actions/workflows/ansible-lint.yaml/badge.svg)](https://github.com/seitleio/ansible-role-docker-nginx-proxy/actions/workflows/ansible-lint.yaml)
 
-This role creates a nginx container that his running github.com/nginx-proxy/nginx-proxy.
+This role creates a [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy/) container that automatically attaches containers to the proxy_network based on environment variables.
 
 Requirements
 ------------

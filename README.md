@@ -53,10 +53,8 @@ Dependencies
 Example Playbook
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
 ```yaml
-- name: Install docker on docker_hosts
+- name: Run nginx-proxy on docker_hosts
   hosts: docker_hosts
   gather_facts: true
   tags:
@@ -70,7 +68,7 @@ Including an example of how to use your role (for instance, with variables passe
       - python3-docker
     when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
   roles:
-    - role: ansible-role-docker
+    - role: ansible-role-docker-nginx-proxy
 ```
 
 License
